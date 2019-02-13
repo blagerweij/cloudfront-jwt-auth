@@ -32,7 +32,7 @@ exports.handler = (event, context, callback) => {
         const header = JSON.parse(base64urlDecode(headerSeg));
         const payload = JSON.parse(base64urlDecode(payloadSeg));
         const signature = base64urlUnescape(signatureSeg);
-        const algorithm = header.alg.slice(0,2); // first the characters indicate algorithm
+        const algorithm = header.alg.slice(0,2); // first two characters indicate algorithm
         const method = algorithmMap[algorithm] + header.alg.slice(2); // map JWA algorithm name to NodeJS implementation
         const input = [headerSeg, payloadSeg].join('.');
         if (algorithm === 'HS') { // HMAC or symmetric algorithm ?
