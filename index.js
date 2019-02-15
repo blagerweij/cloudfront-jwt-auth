@@ -35,7 +35,7 @@ exports.handler = (event, context, callback) => {
           if (signature !== crypto.createHmac(method, key).update(input).digest('base64')) context.fail('Invalid signature');
         } else {
           // line wrap the public key at 64 chars and add header/footer
-          const publicKey = '-----BEGIN PUBLIC KEY-----\n' + key.replace(/(?![^\n]{1,64}$)([^\n]{1,64})\s/g, '$1\n') + '\n-----END PUBLIC KEY-----';
+          const publicKey = '-----BEGIN PUBLIC KEY-----\n' + key.replace(/(.{64})/g, '$1\n') + '\n-----END PUBLIC KEY-----';
           if (!crypto.createVerify(method).update(input).verify(publicKey, signature, 'base64')) context.fail('Invalid signature');
         }
         if (payload.exp && Date.now() > payload.exp*1000) context.fail('Token expired');
