@@ -1,6 +1,5 @@
 'use strict';
 const crypto = require('crypto');
-
 const algorithmMap = {
   HS: 'sha',
   RS: 'RSA-SHA'
@@ -18,10 +17,11 @@ function base64urlUnescape(str) {
 exports.handler = (event, context, callback) => {
     const cfrequest = event.Records[0].cf.request;
     const headers = cfrequest.headers;
-    if (!headers.authorization) {
-        context.fail('no auth header');
+    const authHeader = headers.authorization ? headers.authorization[0].value : null;
+    const token = authHeader && authHeader.startsWith("Bearer ") ? authHeader.slice(7) : cfrequest.querystring;
+    if (!token) {
+        context.fail('Token not found');
     } else {
-        const token = headers.authorization[0].value.slice(7);
         const [headerSeg,payloadSeg,signatureSeg] = token.split('.',3);
         const header = JSON.parse(base64urlDecode(headerSeg));
         const payload = JSON.parse(base64urlDecode(payloadSeg));
@@ -34,7 +34,6 @@ exports.handler = (event, context, callback) => {
         if (algorithm === 'HS') { // HMAC or symmetric algorithm ?
           if (signature !== crypto.createHmac(method, key).update(input).digest('base64')) context.fail('Invalid signature');
         } else {
-          // line wrap the public key at 64 chars and add header/footer
           const publicKey = '-----BEGIN PUBLIC KEY-----\n' + key.replace(/(.{64})/g, '$1\n') + '\n-----END PUBLIC KEY-----';
           if (!crypto.createVerify(method).update(input).verify(publicKey, signature, 'base64')) context.fail('Invalid signature');
         }
