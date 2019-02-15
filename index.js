@@ -1,11 +1,5 @@
 'use strict';
 const crypto = require('crypto');
-var key = '-----BEGIN PUBLIC KEY-----\n' + // TODO: make public key configurable
-'MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDdlatRjRjogo3WojgGHFHYLugd\n' +
-'UWAY9iR3fy4arWNA1KoS8kVw33cJibXr8bvwUAUparCwlvdbH6dvEOfou0/gCFQs\n' +
-'HUfQrSDv+MuSUMAe8jzKE4qW+jK+xQU9a03GUnKHkkle+Q0pX/g6jXZ7r1/xAK5D\n' +
-'o2kQ+X5xK9cipRgEKwIDAQAB\n' +
-'-----END PUBLIC KEY-----';
 
 const algorithmMap = {
   HS: 'sha',
@@ -32,13 +26,17 @@ exports.handler = (event, context, callback) => {
         const header = JSON.parse(base64urlDecode(headerSeg));
         const payload = JSON.parse(base64urlDecode(payloadSeg));
         const signature = base64urlUnescape(signatureSeg);
-        const algorithm = header.alg.slice(0,2); // first two characters indicate algorithm
+        const algorithm = header.alg.slice(0,2); // first the characters indicate algorithm
         const method = algorithmMap[algorithm] + header.alg.slice(2); // map JWA algorithm name to NodeJS implementation
         const input = [headerSeg, payloadSeg].join('.');
+        const origin = cfrequest.origin.s3 ? cfrequest.origin.s3 : cfrequest.origin.custom;
+        const key = origin.customHeaders.jwtkey[0].value;
         if (algorithm === 'HS') { // HMAC or symmetric algorithm ?
           if (signature !== crypto.createHmac(method, key).update(input).digest('base64')) context.fail('Invalid signature');
         } else {
-          if (!crypto.createVerify(method).update(input).verify(key, signature, 'base64')) context.fail('Invalid signature');
+          // line wrap the public key at 64 chars and add header/footer
+          const publicKey = '-----BEGIN PUBLIC KEY-----\n' + key.replace(/(?![^\n]{1,64}$)([^\n]{1,64})\s/g, '$1\n') + '\n-----END PUBLIC KEY-----';
+          if (!crypto.createVerify(method).update(input).verify(publicKey, signature, 'base64')) context.fail('Invalid signature');
         }
         if (payload.exp && Date.now() > payload.exp*1000) context.fail('Token expired');
         delete cfrequest.headers.authorization;
